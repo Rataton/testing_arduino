@@ -9,9 +9,13 @@ int n = 0,
     res = 0,
     displayTime = 0, // El contador display
     displayTimer = 0, // El tiempo a contar display
+    displayTimed = 0, // El tiempo ya restado display
     contador = 0, // El tiempo a contar
     contH = 0, // Horas por contar
     contM = 0, // Minutos por contar
+    restaH = 0, // Horas por contar
+    restaM = 0, // Minutos por contar
+    restaS = 0, // Minutos por contar
     flagBtn1 = 0,
     flagBtn2 = 0,
     flagBtn3 = 0,
@@ -21,11 +25,22 @@ int n = 0,
     preTipo1 = 0,
     preTipo2 = 0,
     preTipo3 = 0,
-    tipo = 0; // Tpo de medición, 1 = minutos, 2 = horas, 0 = sn valor, hay que elegir, se muestra HOLA
+    tiempoTotal = 0, /// El total en minutos u horas a lo qu ehay que restar el conteo
+    startingMillis = 0, // Varibale propiar de millis
+    enEstatus = 0, // Flag para saber si está en modo conteo o en los otros
+    accionTerminar = 0, // Flag para saber si ya se ha ejecutado la acció terminar
+    tipo = 0, // Tpo de medición, 1 = minutos, 2 = horas, 0 = sn valor, hay que elegir, se muestra HOLA
+    estado = 0; // Tipo de estado del timer 0 = parado, 1 = corriendo
+
+bool cuentaMin = false; // Boleanos para definir si tiene que contar por minutos
+bool cuentaHor = false; // Boleanos para definir si tiene que contar por horas
+bool terminado = false; // Boleano para saber si el conteo se ha terminado
+
 unsigned long tiempo = 0;
 const int PLED = 13, // EL led
           CLK = 4, // Set the CLK pin connection to the display
           DIO = 5, // Set the DIO pin connection to the display
+          PRELE = 8, // EL rele
           PSET1 = 9, // Boton 1, define el tipo de medición
           PSET2 = 10, // Boton 1, define el tiempo a contar
           PSET3 = 11; // Botón 3, empieza/detiene la acción
@@ -47,6 +62,18 @@ HORS[] = {
   SEG_E | SEG_G | SEG_C | SEG_D,                     // O
   SEG_E | SEG_G,                                     // r
   SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G      // A
+},
+FINE[] = {
+  SEG_A | SEG_F | SEG_G | SEG_E,                    // F
+  SEG_B | SEG_C,                                    // I
+  SEG_A | SEG_E | SEG_F | SEG_B | SEG_C,            // N
+  SEG_A | SEG_F | SEG_G | SEG_E | SEG_D             // E
+},
+NEL[] = {
+  SEG_G, // -
+  SEG_G, // -
+  SEG_G, // -
+  SEG_G  // -
 };
 
 TM1637Display display(CLK, DIO);  //set up the 4-Digit Display.
@@ -57,6 +84,7 @@ void setup() {
   pinMode(PSET1, OUTPUT);
   pinMode(PSET2, OUTPUT);
   pinMode(PSET3, OUTPUT);
+  pinMode(PRELE, OUTPUT);
 
   display.setBrightness(0x0a);
   display.setSegments(HOLA);
@@ -68,6 +96,8 @@ void setup() {
   lcd.backlight();
   lcd.print("rTimer v0.0.0");
   lcd.setCursor(0, 1);
+  setZeros();
+  terminado = false;
 }
 void loop() {
   btnState1 = digitalRead(PSET1);
@@ -76,34 +106,37 @@ void loop() {
   // Controla el botón 1, tipo de conteo, con un flag que envita hacer cambios mientras se mantiene presionado el botón
   if (btnState1 == HIGH) {
     if (flagBtn1 == 0) {
-      switch (tipo) {
-        case 0:
-          tipo = 1;
-          contador = 0;
-          break;
-        case 1:
-          tipo = 2;
-          contador = 0;
-          break;
-        case 2:
-          tipo = 0;
-          contador = 0;
-          break;
+      if (enEstatus == 1) {
+        tipo = 0;
+      } else {
+        switch (tipo) {
+          case 0:
+            tipo = 1;
+            break;
+          case 1:
+            tipo = 2;
+            break;
+          case 2:
+            tipo = 0;
+            break;
+        }
       }
-      flagBtn1 = 1;
+      setZeros();
+      terminado = false;
     }
     lcd.clear();
     lcd.print("rTimer v0.0.0");
     lcd.setCursor(0, 1);
     lcd.print("btn1 : ");
     lcd.print(tipo);
+    lcd.print(" ");
+    lcd.print(startingMillis);
   } else {
     flagBtn1 = 0;
   }
-
   // Controla el botón 2, tiempo a contar, con un flag que envita hacer cambios mientras se mantiene presionado el botón
   if (btnState2 == HIGH) {
-    if (tipo > 0) {
+    if (tipo > 0 && enEstatus == 0) {
       if (flagBtn2 == 0) {
         contador++;
         flagBtn2 = 1;
@@ -132,8 +165,45 @@ void loop() {
   } else {
     flagBtn2 = 0;
   }
-
-  if (contador == 0) {
+  // Controla el botón 3, inicio/parada timer
+  if (btnState3 == HIGH) {
+    if (tipo > 0 && displayTimer > 0) {
+      if (flagBtn3 == 0) {
+        switch (estado) {
+          case 0:
+            estado = 1;
+            if (startingMillis == 0) {
+              startingMillis = millis();
+            }
+            break;
+          case 1:
+            estado = 0;
+            break;
+        }
+        enEstatus = 1;
+        lcd.clear();
+        lcd.print("rTimer v0.0.0");
+        lcd.setCursor(0, 1);
+        lcd.print("Estatus: ");
+        lcd.print(estado);
+        lcd.print(" ");
+        if (estado == 0) {
+          lcd.print("OFF");
+          cuentaMin = false;
+        } else if (estado == 1) {
+          lcd.print("ON");
+          cuentaMin = true;
+        }
+        flagBtn3 = 1;
+      }
+    } else {
+      enEstatus = 0;
+    }
+  } else {
+    flagBtn3 = 0;
+  }
+  // LO que se ve en el display
+  if (contador == 0 && enEstatus == 0 && cuentaMin == false) {
     if (tipo == 1) {
       display.setSegments(MINS);
     } else if (tipo == 2) {
@@ -142,27 +212,76 @@ void loop() {
       display.setSegments(HOLA);
     }
   }
-
+  // Con boleanos función de conteo en el loop
+  if (cuentaMin && accionTerminar == 0) {
+    conteoMinutos();
+  }
 }
-
-void componeTiempo(int valor) {
-  valor = (mins * 100) + secs;
+void setZeros() {
+  contador = 0;
+  enEstatus = 0;
+  displayTimer = 0;
+  flagBtn1 = 1;
+  flagBtn2 = 0;
+  flagBtn3 = 0;
+  estado = 0;
+  cuentaMin = false;
+  startingMillis = 0;
+  restaM = 0;
+  restaS = 0;
+  tiempoTotal = 0;
+  secs = 0;
+  accionTerminar = 0;
+  // digitalWrite(PRELE, HIGH);
 }
-
+void terminar() {
+  accionTerminar = 1;
+  display.setSegments(FINE);
+  // digitalWrite(PRELE, LOW);
+  lcd.clear();
+  lcd.print("rTimer v0.0.0");
+  lcd.setCursor(0, 1);
+  lcd.print("Ha terminado");
+}
 void conteoMinutos() {
-  tiempo = millis();
+  tiempo = millis() - startingMillis;
   res = tiempo % 1000;
   if (res == 0) {
+    switch (tipo) {
+      case 1: // Minutos
+        tiempoTotal = (((contH * 60) + contador) * 60) - secs ; // Pasa el total de minutos a segundos y resta los uque llevamos
+        // Luego lo pasa a formaato visible
+        restaM = floor(tiempoTotal / 60);
+        restaS = tiempoTotal - (restaM * 60);
+        tiempoTotal = (restaM * 100) +  restaS;
+        break;
+      case 2:
+
+        break;
+    }
+    if (tiempoTotal > 0) {
+      display.showNumberDec(tiempoTotal, true);
+      digitalWrite(PRELE, HIGH);
+    } else if (tiempoTotal == 0) {
+      display.showNumberDec(tiempoTotal, true);
+      digitalWrite(PRELE, HIGH);
+    } else if (tiempoTotal <= 0) {
+      // display.setSegments(NEL);
+      if (accionTerminar == 0) {
+        terminar();
+        digitalWrite(PRELE, LOW);
+      }
+      terminado = true;
+    }
     secs++;
-    if (secs == 60) {
-      mins++;
-      secs = 0;
+    displayTime = (mins * 100) + secs;
+    lcd.clear();
+    lcd.print("rTimer v0.0.0");
+    lcd.setCursor(0, 1);
+    lcd.print("Tiempo: ");
+    lcd.print(displayTime);
+    if (terminado) {
+      lcd.print(" !!!");
     }
-    if (mins == 60) {
-      hors ++;
-      mins = 0;
-    }
-    componeTiempo(displayTime);
-    display.showNumberDec(displayTime, true);
   }
 }
