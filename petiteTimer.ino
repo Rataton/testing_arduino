@@ -150,6 +150,7 @@ void loop() {
           lcd.print(" min: ");
           if (contador == 60) {
             contador = 0;
+            contH++;
           }
           displayTimer = (contH * 100) + contador;
           display.showNumberDec(displayTimer, true);
@@ -219,6 +220,7 @@ void loop() {
 }
 void setZeros() {
   contador = 0;
+  contH = 0;
   enEstatus = 0;
   displayTimer = 0;
   flagBtn1 = 1;
@@ -255,8 +257,12 @@ void conteoMinutos() {
         restaS = tiempoTotal - (restaM * 60);
         tiempoTotal = (restaM * 100) +  restaS;
         break;
-      case 2:
-
+      case 2: // Horas
+        tiempoTotal = ((contador * 60) * 60) - secs ; // Pasa el total de minutos a segundos y resta los uque llevamos
+        // Luego lo pasa a formaato visible
+        restaM = floor((tiempoTotal / 60) / 60);
+        restaS = tiempoTotal - (restaM * 60);
+        tiempoTotal = (restaM * 100) +  restaS;
         break;
     }
     if (tiempoTotal > 0) {
