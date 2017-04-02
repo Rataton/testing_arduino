@@ -1,16 +1,19 @@
+/**
+petiteTimer v 1.0.0
+Cuenta regresiva de tiempo con dos modalidades
+HORAS y MINUTOS
+*/
+
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
 #include <TM1637Display.h>
 
 int n = 0,
     mins = 0,
     secs = 0,
-    hors = 0,
     res = 0,
     resBlink = 0,
     displayTime = 0, // El contador display
     displayTimer = 0, // El tiempo a contar display
-    displayTimed = 0, // El tiempo ya restado display
     contador = 0, // El tiempo a contar
     contH = 0, // Horas por contar
     contM = 0, // Minutos por contar
@@ -23,9 +26,6 @@ int n = 0,
     btnState1 = 0,
     btnState2 = 0,
     btnState3 = 0,
-    preTipo1 = 0,
-    preTipo2 = 0,
-    preTipo3 = 0,
     tiempoTotal = 0, /// El total en minutos u horas a lo qu ehay que restar el conteo
     startingMillis = 0, // Varibale propiar de millis
     enEstatus = 0, // Flag para saber si está en modo conteo o en los otros
@@ -34,18 +34,17 @@ int n = 0,
     estado = 0; // Tipo de estado del timer 0 = parado, 1 = corriendo
 
 bool cuentaMin = false; // Boleanos para definir si tiene que contar por minutos
-bool cuentaHor = false; // Boleanos para definir si tiene que contar por horas
 bool terminado = false; // Boleano para saber si el conteo se ha terminado
 bool blinkColon = true; // Boleano para tratar de hacer que el colon haga blink
 
 unsigned long tiempo = 0;
-const int PLED = 13, // EL led
-          CLK = 4, // Set the CLK pin connection to the display
-          DIO = 5, // Set the DIO pin connection to the display
-          PRELE = 8, // EL rele
-          PSET1 = 9, // Boton 1, define el tipo de medición
-          PSET2 = 10, // Boton 1, define el tiempo a contar
-          PSET3 = 11; // Botón 3, empieza/detiene la acción
+const int
+CLK = 4, // Set the CLK pin connection to the display
+DIO = 5, // Set the DIO pin connection to the display
+PRELE = 8, // EL rele
+PSET1 = 9, // Boton 1, define el tipo de medición
+PSET2 = 10, // Boton 1, define el tiempo a contar
+PSET3 = 11; // Botón 3, empieza/detiene la acción
 
 byte HOLA[] = {
   SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,             // H
@@ -79,25 +78,15 @@ NEL[] = {
 };
 
 TM1637Display display(CLK, DIO);  //set up the 4-Digit Display.
-LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void setup() {
-  pinMode(PLED, OUTPUT);
   pinMode(PSET1, OUTPUT);
   pinMode(PSET2, OUTPUT);
   pinMode(PSET3, OUTPUT);
   pinMode(PRELE, OUTPUT);
-
   display.setBrightness(0x0a);
   display.setSegments(HOLA);
   display.setColon(blinkColon);
-
-  digitalWrite(PLED, false);
-
-  lcd.begin();
-  lcd.backlight();
-  lcd.print("rTimer v0.0.0");
-  lcd.setCursor(0, 1);
   setZeros();
   terminado = false;
 }
@@ -126,13 +115,6 @@ void loop() {
       setZeros();
       terminado = false;
     }
-    lcd.clear();
-    lcd.print("rTimer v0.0.0");
-    lcd.setCursor(0, 1);
-    lcd.print("btn1 : ");
-    lcd.print(tipo);
-    lcd.print(" ");
-    lcd.print(startingMillis);
   } else {
     flagBtn1 = 0;
   }
@@ -143,13 +125,8 @@ void loop() {
         contador++;
         flagBtn2 = 1;
       }
-      lcd.clear();
-      lcd.print("rTimer v0.0.0");
-      lcd.setCursor(0, 1);
-      lcd.print("Defino ");
       switch (tipo) {
         case 1:
-          lcd.print(" min: ");
           if (contador == 60) {
             contador = 0;
             contH++;
@@ -158,13 +135,11 @@ void loop() {
           display.showNumberDec(displayTimer, true);
           break;
         case 2:
-          lcd.print(" hora: ");
           if (contador > 25) contador = 24;
           displayTimer = contador * 100;
           display.showNumberDec(displayTimer, true);
           break;
       }
-      lcd.print(contador);
     }
   } else {
     flagBtn2 = 0;
@@ -185,17 +160,9 @@ void loop() {
             break;
         }
         enEstatus = 1;
-        lcd.clear();
-        lcd.print("rTimer v0.0.0");
-        lcd.setCursor(0, 1);
-        lcd.print("Estatus: ");
-        lcd.print(estado);
-        lcd.print(" ");
         if (estado == 0) {
-          lcd.print("OFF");
           cuentaMin = false;
         } else if (estado == 1) {
-          lcd.print("ON");
           cuentaMin = true;
         }
         flagBtn3 = 1;
@@ -237,16 +204,10 @@ void setZeros() {
   tiempoTotal = 0;
   secs = 0;
   accionTerminar = 0;
-  // digitalWrite(PRELE, HIGH);
 }
 void terminar() {
   accionTerminar = 1;
   display.setSegments(FINE);
-  // digitalWrite(PRELE, LOW);
-  lcd.clear();
-  lcd.print("rTimer v0.0.0");
-  lcd.setCursor(0, 1);
-  lcd.print("Ha terminado");
 }
 void conteoMinutos() {
   tiempo = millis() - startingMillis;
@@ -255,10 +216,8 @@ void conteoMinutos() {
   if (res == 0) {
     if (blinkColon) {
       blinkColon = false;
-      lcd.print(" + ");
     } else if (!blinkColon) {
       blinkColon = true;
-      lcd.print(" - ");
     }
     display.setColon(blinkColon);
 
@@ -285,7 +244,6 @@ void conteoMinutos() {
       display.showNumberDec(tiempoTotal, true);
       digitalWrite(PRELE, HIGH);
     } else if (tiempoTotal <= 0) {
-      // display.setSegments(NEL);
       if (accionTerminar == 0) {
         terminar();
         digitalWrite(PRELE, LOW);
@@ -294,13 +252,5 @@ void conteoMinutos() {
     }
     secs++;
     displayTime = (mins * 100) + secs;
-    lcd.clear();
-    lcd.print("rTimer v0.0.0");
-    lcd.setCursor(0, 1);
-    lcd.print("Tiempo: ");
-    lcd.print(displayTime);
-    if (terminado) {
-      lcd.print(" !!!");
-    }
   }
 }
